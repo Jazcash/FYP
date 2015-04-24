@@ -1,176 +1,23 @@
-#include <pololu/Pololu3pi.h>
-#include <avr/eeprom.h>
-#include <avr/pgmspace.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <math.h>
+#include "lineMaze.h"
 
-void* operator new(size_t objsize) {
-	return malloc(objsize);
+void initialise(){
+	pololu_3pi_init(2000);
+	load_custom_characters();
+	load_custom_characters();
+	loadCalibration();
+	play_from_program_space(bloop);
+	
+	foundFinish = false;
+	isLeft = false;
+	isRight = false;
+	isForward = false;
+	
+	currentDir.dir = NORTH;
+	currentPos.x = 0;
+	currentPos.y = 0;
 }
 
-void operator delete(void* obj) {
-	free(obj);
-}
-
-enum Turn { LEFT, RIGHT, BACK };
-enum Direction { SOUTH, WEST, NORTH, EAST };
-
-struct cDirection {
-	Direction dir;
-
-	void next() {
-		int faceInt = dir;
-		if (faceInt == 3) {
-			faceInt = -1;
-		}
-		this->dir = static_cast<Direction>(faceInt + 1);
-	}
-	void previous() {
-		int faceInt = dir;
-		if (faceInt <= 0) {
-			faceInt = 4;
-		}
-		this->dir = static_cast<Direction>(faceInt - 1);
-	}
-	Direction getNext() {
-		int faceInt = dir;
-		if (faceInt >= 3) {
-			faceInt = -1;
-		}
-		return static_cast<Direction>(faceInt + 1);
-	}
-	Direction getPrevious() {
-		int faceInt = dir;
-		if (faceInt <= 0) {
-			faceInt = 4;
-		}
-		return static_cast<Direction>(faceInt - 1);
-	}
-	Direction getOpposite(){
-		int faceInt = dir;
-		if (faceInt >= 3) {
-			faceInt = -1;
-		}
-		Direction temp = static_cast<Direction>(faceInt + 1);
-		faceInt = temp;
-		if (faceInt >= 3) {
-			faceInt = -1;
-		}
-		return static_cast<Direction>(faceInt + 1);
-	}
-	operator Direction() { return dir; }
-};
-
-struct position {
-	int8_t x, y;
-	bool operator == (const position &RHS) {
-		return (this->x == RHS.x && this->y == RHS.y);
-	}
-	bool operator != (const position &RHS) {
-		return (this->x != RHS.x || this->y != RHS.y);
-	}
-};
-
-struct node {
-	position pos;
-	bool visited;
-	node* connections[4]; // 0 = South (where mouse came from), 1 = West, 2 = North, 3 = East
-	node* parent;
-	float f, g, h;
-
-	node(){
-		this->visited = false;
-		for (int i=0; i<4; i++){
-			this->connections[i] = NULL;
-		}
-	}
-	
-	void setPosition(position p){
-		this->pos = p;
-	}
-	
-	void setPosition(int x, int y){
-		this->pos.x = x;
-		this->pos.y = y;
-	}
-	
-	void addConnection(Direction d, node* n){
-		switch(d){
-			case SOUTH:
-			this->connections[0] = n;
-			break;
-			case WEST:
-			this->connections[1] = n;
-			break;
-			case NORTH:
-			this->connections[2] = n;
-			break;
-			case EAST:
-			this->connections[3] = n;
-			break;
-			default:
-			break;
-		}
-	}
-	
-	node* getConnection(Direction d){
-		switch(d){
-			case SOUTH:
-			return connections[0];
-			break;
-			case WEST:
-			return connections[1];
-			break;
-			case NORTH:
-			return connections[2];
-			break;
-			case EAST:
-			return connections[3];
-			break;
-			default:
-			break;
-		}
-	}
-};
-
-unsigned int calibrated_maximum_on[5] EEMEM;
-unsigned int calibrated_minimum_on[5] EEMEM;
-
-bool isForward, isLeft, isRight;
-
-cDirection currentDir;
-position currentPos;
-
-void saveCalibration();
-void loadCalibration();
-void turn(Turn t);
-void stop();
-void mapMaze();
-void followLine();
-void load_custom_characters();
-void display_readings(const unsigned int *calibrated_values);
-int8_t followSegment();
-
-const char levels[] PROGMEM = {
-	0b00000,
-	0b00000,
-	0b00000,
-	0b00000,
-	0b00000,
-	0b00000,
-	0b00000,
-	0b11111,
-	0b11111,
-	0b11111,
-	0b11111,
-	0b11111,
-	0b11111,
-	0b11111
-};
-
-void load_custom_characters()
-{
+void load_custom_characters(){
 	lcd_load_custom_character(levels+0,0); // no offset, e.g. one bar
 	lcd_load_custom_character(levels+1,1); // two bars
 	lcd_load_custom_character(levels+2,2); // etc...
@@ -190,39 +37,40 @@ void display_readings(const unsigned int *calibrated_values){
 	}
 }
 
-int randomBetween(int a, int b){
-	return rand() % ( b - a + 1) + a;
+void calibrate(){
+	unsigned int counter;
+	delay_ms(1000);
+	for(counter=0;counter<80;counter++){
+		if(counter < 20 || counter >= 60){
+			set_motors(40,-40);
+		} else {
+			set_motors(-40,40);
+		}
+		calibrate_line_sensors(IR_EMITTERS_ON);
+		delay_ms(20);
+	}
+	set_motors(0,0);
+	
+	saveCalibration();
 }
 
 int main(){
-	unsigned int sensors[5];
-	pololu_3pi_init(2000);
-	load_custom_characters();
-	loadCalibration();
-	play_frequency(1000, 200, 10);
-	
-	clear();
-	print("Press B");
+	initialise();
 	
 	while(1){
+		clear();
+		print(" ");
+		print_long(read_battery_millivolts());
+		print("mv");
+		delay_ms(20);
+		
 		if (button_is_pressed(BUTTON_A)){
-			unsigned int counter;
-			delay_ms(1000);
-			for(counter=0;counter<80;counter++){
-				if(counter < 20 || counter >= 60){
-					set_motors(40,-40);
-					} else {
-					set_motors(-40,40);
-				}
-				calibrate_line_sensors(IR_EMITTERS_ON);
-				delay_ms(20);
-			}
-			set_motors(0,0);
-			
-			saveCalibration();
-			} else if(button_is_pressed(BUTTON_B)){
+			//calibrate();
 			mapMaze();
-			} else if(button_is_pressed(BUTTON_C)){
+		} else if(button_is_pressed(BUTTON_B)){
+			
+		} else if(button_is_pressed(BUTTON_C)){
+			unsigned int sensors[5];
 			while(1){
 				unsigned int position = read_line(sensors, IR_EMITTERS_ON);
 				clear();
@@ -237,118 +85,119 @@ int main(){
 	return 0;
 }
 
-int8_t head = 0;
-node* nodes[40];
-
-node* getNodeByPosition(position p){
-	for (int i=0; i<head; i++){
-		if (nodes[i]->pos == p){
-			return nodes[i];
-		}
-	}
-	return NULL;
-}
-
 void faceDir(Direction d){
 	if (currentDir.getNext() == d){
 		turn(RIGHT);
-		} else if(currentDir.getPrevious() == d){
+	} else if(currentDir.getPrevious() == d){
 		turn(LEFT);
-		} else if(currentDir.getOpposite() == d){
+	} else if(currentDir.getOpposite() == d){
 		turn(BACK);
-		} else {
-		clear();
-		print("ERR");
 	}
 }
 
-void mapMaze2(){
+void faceDir(int i){
+	Direction d = static_cast<Direction>(i);
+	faceDir(d);
+}
+
+void travelTo(int8_t x, int8_t y){
 	
 }
 
 void mapMaze(){
+	int startRAM = get_free_ram();
+	
 	currentDir.dir = NORTH;
 	currentPos.x = 0;
 	currentPos.y = 0;
 	
-	nodes[head] = new node;
-	nodes[head]->setPosition(currentPos);
-	nodes[head]->addConnection(NORTH, new node);
-	nodes[head]->visited = true;
+	//myNodeStack = NodeStack();
 	
-	node* lastNode = nodes[head];
+	node* allNodes[50];
+	int head = 0;
+	
+	node* root = new node;
+	root->setPosition(currentPos);
+	root->connections[2] = new node;
+	root->visited = true;
+	
+	allNodes[head] = root;
+	
+	myNodeStack.push(root, NORTH);
 	
 	int i;
-	
-	while(1){
-		followLine();
+	while(!myNodeStack.isEmpty()){
+		node* currentNode = myNodeStack.getTop();
 		
-		node* thisNode = getNodeByPosition(currentPos);
-		if (thisNode != NULL){
-			delete lastNode->connections[i];
-			lastNode->connections[i] = thisNode;
-		} else {
-			thisNode = new node;
-			thisNode->setPosition(currentPos);
-			thisNode->addConnection(currentDir.getOpposite(), new node);
-			if (isLeft){
-				thisNode->addConnection(currentDir.getPrevious(), new node);
-			}
-			if (isRight){
-				thisNode->addConnection(currentDir.getNext(), new node);
-			}
-			if (isForward){
-				thisNode->addConnection(currentDir, new node);
-			}
-		}
+		clear();
 		
-		thisNode->visited = true;
+		//print(" ");
+		//print_long(currentPos.x);
+		//print(", ");
+		//print_long(currentPos.y);
 		
-		nodes[head] = thisNode;
+		print(" ");
+		print_long(get_free_ram());
 		
-		head++;
+		lcd_goto_xy(0, 1);
 		
-		nodes[head]->visited = true;
-
-		node* nextNode = NULL;
+		print(" ");
+		print_long(startRAM - get_free_ram());
 		
-		for (i=0; i<4; i++){
-			if (nodes[head]->connections[i] != NULL){
-				if (nodes[head]->connections[i]->visited == false){
-					nextNode = nodes[head]->connections[i];
+		//delay_ms(1000);
+		
+		wait_for_button(BUTTON_B);
+		
+		for (i=3; i>-1; i--){
+			if (currentNode->connections[i] != NULL){
+				if (currentNode->connections[i]->visited == false){
 					break;
 				}
 			}
 		}
 		
-		if (nextNode != NULL){ // if there is an unvisited node attached to this node
+		if (i == -1){ // this node has no unvisited connections
+			cDirection d;
+			d = myNodeStack.pop();
+			faceDir(d.getOpposite());
+			followLine();
+		} else {
+			faceDir(i);
+			followLine();
 			
-		} else { // if not, then find the next node with unvisited connections and travel to it
-			
-		}
-		
-		if (nextNode != NULL){
-			switch(i){
-				case 0:
-				faceDir(SOUTH);
-				break;
-				case 1:
-				faceDir(EAST);
-				break;
-				case 2:
-				faceDir(WEST);
-				break;
-				case 3:
-				faceDir(NORTH);
-				break;
-				default:
-				break;
+			node* nextNode = NULL;
+			for (int j=0; j<=head; j++){
+				if (allNodes[j]->pos == currentPos){
+					nextNode = allNodes[j];
+					break;
+				}
 			}
+			
+			if (nextNode == NULL){ // new node
+				//play_frequency(1000, 100, 10);
+				
+				nextNode = new node;
+				nextNode->setPosition(currentPos);
+				if (isLeft) nextNode->connections[currentDir.getPrevious()] = new node;
+				if (isRight) nextNode->connections[currentDir.getNext()] = new node;
+				if (isForward) nextNode->connections[currentDir] = new node;
+				nextNode->visited = true;
+				head++;
+				allNodes[head] = nextNode;
+			}
+			
+			//delete currentNode->connections[i];
+			currentNode->connections[i] = nextNode;
+			//delete nextNode->connections[currentDir.getOpposite()];
+			nextNode->connections[currentDir.getOpposite()] = currentNode;
+			
+			myNodeStack.push(nextNode, currentDir);
 		}
-		
-		followLine();
 	}
+	
+	faceDir(currentDir.getOpposite());
 }
+
 
 void followLine(){
 	while(1){
@@ -373,9 +222,9 @@ void followLine(){
 		
 		if (isLeft && !isRight && !isForward){
 			turn(LEFT);
-			} else if(isRight && !isLeft && !isForward){
+		} else if(isRight && !isLeft && !isForward){
 			turn(RIGHT);
-			} else {
+		} else {
 			break;
 		}
 	}
@@ -410,30 +259,32 @@ void loadCalibration(){
 
 void turn(Turn t){
 	unsigned int sensors[5];
-	read_line(sensors,IR_EMITTERS_ON);
+	unsigned int turnCalibration = 600;
 	
 	switch(t){
 		case LEFT:
-		play_frequency(500, 200, 10);
 		set_motors(-40, 40);
-		while (sensors[2] < 950){
+		delay_ms(200);
+		read_line(sensors,IR_EMITTERS_ON);
+		while (sensors[2] < turnCalibration){
 			read_line(sensors,IR_EMITTERS_ON);
 		}
 		currentDir.previous();
 		break;
 		case RIGHT:
-		play_frequency(1000, 200, 10);
 		set_motors(40, -40);
-		while (sensors[2] < 950){
+		delay_ms(200);
+		read_line(sensors,IR_EMITTERS_ON);
+		while (sensors[2] < turnCalibration){
 			read_line(sensors,IR_EMITTERS_ON);
 		}
 		currentDir.next();
 		break;
 		case BACK:
-		play_frequency(1500, 200, 10);
 		set_motors(40, -40);
 		delay_ms(700);
-		while (sensors[2] < 950){
+		read_line(sensors,IR_EMITTERS_ON);
+		while (sensors[2] < turnCalibration){
 			read_line(sensors,IR_EMITTERS_ON);
 		}
 		stop();
@@ -441,8 +292,6 @@ void turn(Turn t){
 		currentDir.next();
 		break;
 		default:
-		clear();
-		print("No turn");
 		break;
 	}
 	stop();
@@ -458,13 +307,14 @@ int8_t followSegment(){
 	int last_proportional = 0;
 	long integral=0;
 	
+	unsigned int sensors[5];
+	
 	while(1){
 		// Normally, we will be following a line.  The code below is
 		// similar to the 3pi-linefollower-pid example, but the maximum
 		// speed is turned down to 60 for reliability.
 		
 		// Get the position of the line.
-		unsigned int sensors[5];
 		unsigned int position = read_line(sensors,IR_EMITTERS_ON);
 		
 		// The "proportional" term should be 0 when we are on the line.
@@ -497,7 +347,7 @@ int8_t followSegment(){
 		
 		if(power_difference < 0) {
 			set_motors(max+power_difference,max);
-			} else {
+		} else {
 			set_motors(max,max-power_difference);
 		}
 		
@@ -506,7 +356,8 @@ int8_t followSegment(){
 		// sensors 0 and 4 for detecting lines going to the left and
 		// right.
 		
-		if(sensors[1] < 100 && sensors[2] < 100 && sensors[3] < 100){
+
+		if(sensors[1] < 350 && sensors[2] < 350 && sensors[3] < 350){
 			// There is no line visible ahead, and we didn't see any
 			// intersection.  Must be a dead end.
 			
@@ -517,7 +368,7 @@ int8_t followSegment(){
 			stop();
 			
 			break;
-			} else if(sensors[0] > 150 || sensors[4] > 150) {
+		} else if(sensors[0] > 350 || sensors[4] > 350) {		
 			// Found an intersection.
 			set_motors(40, 40);
 			delay_ms(50);
@@ -531,7 +382,19 @@ int8_t followSegment(){
 			stop();
 			
 			read_line(sensors,IR_EMITTERS_ON);
-			isForward = (sensors[1] > 150 || sensors[2] > 150 || sensors[3] > 150);
+			
+			if (sensors[0] > 350 && sensors[1] > 350 && sensors[2] > 350 && sensors[3] > 350 && sensors[4] > 350){
+				play_frequency(2000, 100, 10);
+				foundFinish = true;
+				isLeft = false;
+				isRight = false;
+				isForward = false;
+				break;
+			} else {
+				foundFinish = false;
+			}
+			
+			isForward = (sensors[1] > 350 || sensors[2] > 350 || sensors[3] > 350);
 			
 			break;
 		}
@@ -539,15 +402,21 @@ int8_t followSegment(){
 	
 	unsigned long totalTime = millis() - startTime;
 	
+	//clear();
+	//print(" ");
+	//print_long(totalTime);
+	
+	//wait_for_button(BUTTON_B);
+	
 	if (totalTime >= 50 && totalTime <= 850){
 		return 1;
-		} else if(totalTime > 850 && totalTime <= 1400){
+	} else if(totalTime > 850 && totalTime <= 1300){
 		return 2;
-		} else if(totalTime > 1400 && totalTime <= 2000){
+	} else if(totalTime > 1300 && totalTime <= 1850){
 		return 3;
-		} else if(totalTime > 2000 && totalTime <= 2600){
+	} else if(totalTime > 1850 && totalTime <= 2700){
 		return 4;
-		} else {
+	} else {
 		return 0;
 	}
 }

@@ -145,7 +145,31 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="cardinalDirection.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="enums.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lineMaze.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="lineMaze.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="node.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="NodeStack.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="position.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="stack.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="utility.h">
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>
