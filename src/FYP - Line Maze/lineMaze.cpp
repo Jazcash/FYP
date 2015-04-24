@@ -54,21 +54,36 @@ void calibrate(){
 	saveCalibration();
 }
 
+void memTest(){
+	int startRam = get_free_ram();
+	clear();
+	print(" ");
+	print_long(startRam - get_free_ram());
+	lcd_goto_xy(0, 1);
+	
+	NodeStack myNodeStack;
+	node* a = new node;
+	myNodeStack.push(a, NORTH);
+	
+	print(" ");
+	print_long(startRam - get_free_ram());
+}
+
 int main(){
 	initialise();
 	
 	while(1){
-		clear();
-		print(" ");
-		print_long(read_battery_millivolts());
-		print("mv");
-		delay_ms(20);
+		//clear();
+		//print(" ");
+		//print_long(read_battery_millivolts());
+		//print("mv");
+		//delay_ms(20);
 		
 		if (button_is_pressed(BUTTON_A)){
 			//calibrate();
-			mapMaze();
+			memTest();
 		} else if(button_is_pressed(BUTTON_B)){
-			
+			mapMaze();
 		} else if(button_is_pressed(BUTTON_C)){
 			unsigned int sensors[5];
 			while(1){
@@ -130,22 +145,12 @@ void mapMaze(){
 		node* currentNode = myNodeStack.getTop();
 		
 		clear();
-		
-		//print(" ");
-		//print_long(currentPos.x);
-		//print(", ");
-		//print_long(currentPos.y);
-		
 		print(" ");
 		print_long(get_free_ram());
-		
 		lcd_goto_xy(0, 1);
-		
 		print(" ");
 		print_long(startRAM - get_free_ram());
-		
 		//delay_ms(1000);
-		
 		wait_for_button(BUTTON_B);
 		
 		for (i=3; i>-1; i--){
@@ -174,21 +179,36 @@ void mapMaze(){
 			}
 			
 			if (nextNode == NULL){ // new node
-				//play_frequency(1000, 100, 10);
+				play_from_program_space(bloop);
 				
 				nextNode = new node;
+				
+				clear();
+				print(" ");
+				print_long(get_free_ram());
+				
+				lcd_goto_xy(0, 1);
+				
+				print(" ");
+				print_long(startRAM - get_free_ram());
+				
+				//delay_ms(1000);
+				
+				wait_for_button(BUTTON_B);
+				
 				nextNode->setPosition(currentPos);
 				if (isLeft) nextNode->connections[currentDir.getPrevious()] = new node;
 				if (isRight) nextNode->connections[currentDir.getNext()] = new node;
 				if (isForward) nextNode->connections[currentDir] = new node;
+				
 				nextNode->visited = true;
 				head++;
 				allNodes[head] = nextNode;
 			}
 			
-			//delete currentNode->connections[i];
+			delete currentNode->connections[i];
 			currentNode->connections[i] = nextNode;
-			//delete nextNode->connections[currentDir.getOpposite()];
+			delete nextNode->connections[currentDir.getOpposite()];
 			nextNode->connections[currentDir.getOpposite()] = currentNode;
 			
 			myNodeStack.push(nextNode, currentDir);
@@ -211,10 +231,10 @@ void followLine(){
 			currentPos.y -= tilesTravelled;
 			break;
 			case EAST:
-			currentPos.x += tilesTravelled;
+			currentPos.x -= tilesTravelled;
 			break;
 			case WEST:
-			currentPos.x -= tilesTravelled;
+			currentPos.x += tilesTravelled;
 			break;
 			default:
 			break;

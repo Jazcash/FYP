@@ -22,7 +22,6 @@ bool foundFinish;
 
 cDirection currentDir;
 position currentPos;
-
 NodeStack myNodeStack;
 
 const char bloop[] PROGMEM = ">g32>>c32";

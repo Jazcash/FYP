@@ -9,6 +9,7 @@ struct node {
 	position pos;
 	bool visited;
 	node* connections[4]; // 0 = South (where mouse came from), 1 = West, 2 = North, 3 = East
+	//int8_t costs[4];
 	//node* parent;
 	//float f, g, h;
 
@@ -16,6 +17,11 @@ struct node {
 		this->visited = false;
 		for (int i=0; i<4; i++){
 			this->connections[i] = NULL;
+		}
+	}
+	~node(){
+		for (int i=0; i<4; i++){
+			delete connections[i];
 		}
 	}
 	
