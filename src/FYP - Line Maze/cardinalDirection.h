@@ -48,6 +48,7 @@ struct cDirection {
 	}
 	operator Direction() { return dir; }
 	void operator=(const Direction &lhs){ dir = lhs; }
+	void operator=(const int8_t &lhs){ dir = static_cast<Direction>(lhs); }
 };
 
 #endif /* CARDINALDIRECTION_H_ */

@@ -9,14 +9,17 @@ struct node {
 	position pos;
 	bool visited;
 	node* connections[4]; // 0 = South (where mouse came from), 1 = West, 2 = North, 3 = East
-	//int8_t costs[4];
-	//node* parent;
-	//float f, g, h;
+	int8_t costs[4];
+	int8_t gCost;
+	node* parent;
 
 	node(){
 		this->visited = false;
 		for (int i=0; i<4; i++){
 			this->connections[i] = NULL;
+			this->costs[i] = -1;
+			this->gCost = -1;
+			this->parent = NULL;
 		}
 	}
 	~node(){

@@ -145,10 +145,6 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Bitfield.h">
-      <SubType>compile</SubType>
-      <CustomCompilationSetting Condition="'$(Configuration)' == 'Debug'">-Os</CustomCompilationSetting>
-    </Compile>
     <Compile Include="cardinalDirection.h">
       <SubType>compile</SubType>
       <CustomCompilationSetting Condition="'$(Configuration)' == 'Debug'">-Os</CustomCompilationSetting>
@@ -174,10 +170,6 @@
       <CustomCompilationSetting Condition="'$(Configuration)' == 'Debug'">-Os</CustomCompilationSetting>
     </Compile>
     <Compile Include="position.h">
-      <SubType>compile</SubType>
-      <CustomCompilationSetting Condition="'$(Configuration)' == 'Debug'">-Os</CustomCompilationSetting>
-    </Compile>
-    <Compile Include="stack.h">
       <SubType>compile</SubType>
       <CustomCompilationSetting Condition="'$(Configuration)' == 'Debug'">-Os</CustomCompilationSetting>
     </Compile>

@@ -23,6 +23,10 @@ bool foundFinish;
 cDirection currentDir;
 position currentPos;
 NodeStack myNodeStack;
+node* root;
+node* finish;
+int8_t costCounter;
+int8_t speed;
 
 const char bloop[] PROGMEM = ">g32>>c32";
 
@@ -33,11 +37,11 @@ void loadCalibration();
 void turn(Turn t);
 void stop();
 void mapMaze();
-void followLine();
 void load_custom_characters();
 void display_readings(const unsigned int *calibrated_values);
+int8_t followLine(); // returns the number of tiles travelled
 int8_t followSegment();  // returns the number of tiles travelled
 void faceDir(Direction d);
-void travelTo(int8_t x, int8_t y);
+void astarTravel(node* n);
 
 #endif /* LINEMAZE_H_ */
