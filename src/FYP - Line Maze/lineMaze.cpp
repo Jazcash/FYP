@@ -487,8 +487,11 @@ void stop(){
 int8_t followSegment(){
 	unsigned long startTime = millis();
 	
-	int last_proportional = 0;
-	long integral=0;
+	int previousProportional = 0;
+	long integral = 0;
+	int Kp = 20,
+		Ki = 10000,
+		Kd = 1.5;
 	
 	unsigned int threshhold = 350;
 	
@@ -497,27 +500,26 @@ int8_t followSegment(){
 	while(1){
 		unsigned int position = read_line(sensors,IR_EMITTERS_ON);
 		
-		int proportional = ((int)position) - 1900;
+		int proportional = position - 1900;
 		
-		int derivative = proportional - last_proportional;
+		int derivative = proportional - previousProportional;
 		integral += proportional;
 		
-		last_proportional = proportional;
+		previousProportional = proportional;
 		
-		int power_difference = proportional/20 + integral/10000 + derivative*3/2;
-
-		const int max = speed
-		if(power_difference > max) {
-			power_difference = max;
+		int motorDiff = (proportional / Kp) + (integral * Ki) + (derivative * Kd);
+		const int maxSpeed = speed;
+		if(motorDiff > maxSpeed) {
+			motorDiff = maxSpeed;
 		}
-		if(power_difference < -max) {
-			power_difference = -max;
+		if(motorDiff < -maxSpeed) {
+			motorDiff = -maxSpeed;
 		}
 		
-		if(power_difference < 0) {
-			set_motors(max+power_difference,max);
-			} else {
-			set_motors(max,max-power_difference);
+		if(motorDiff < 0) {
+			set_motors(maxSpeed + motorDiff, maxSpeed);
+		} else {
+			set_motors(maxSpeed, maxSpeed - motorDiff);
 		}
 		
 		if(sensors[1] < threshhold && sensors[2] < threshhold && sensors[3] < threshhold){
