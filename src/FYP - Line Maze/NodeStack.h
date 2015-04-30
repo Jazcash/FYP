@@ -83,6 +83,8 @@ int NodeStack::size(){
 	return count;
 }
 
+/* Alternative implementation using defined stack memory */
+
 //#define STACK_MAX 40
 //
 //struct NodeStack {
